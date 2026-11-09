@@ -29,7 +29,7 @@ export function AuthForm({ mode, googleEnabled }: { mode: 'login' | 'register'; 
       const data = await response.json();
       if (!response.ok) { setError(data.error ?? 'No pudimos completar la solicitud.'); return; }
       await refresh();
-      await router.replace(router.query.next === '/dashboard' && data.user.role === 'administrador' ? '/dashboard' : '/login/account');
+      await router.replace('/dashboard');
     } catch { setError('No pudimos conectar. Inténtalo de nuevo.'); }
     finally { setBusy(false); }
   };

@@ -35,7 +35,7 @@ try {
   }
   assert.deepEqual((await pool.query('SELECT id, role, seed_key FROM users WHERE seed_key IS NOT NULL ORDER BY seed_key')).rows, seedBefore);
   assert.equal(seedBefore.length, 2);
-  assert.equal((await pool.query('SELECT count(*)::int AS n FROM schema_migrations')).rows[0].n, 1);
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM schema_migrations')).rows[0].n, 2);
   assert.equal((await pool.query(`SELECT count(*)::int AS n FROM users u LEFT JOIN roles r ON r.name=u.role WHERE r.name IS NULL`)).rows[0].n, 0);
   await assert.rejects(pool.query("INSERT INTO oauth_accounts(provider, subject, user_id) VALUES ('google', $1, $2)", [`missing-${run}`, randomUUID()]), (error: unknown) => (error as { code: string }).code === '23503');
   checks.push('Conexión petshop; migración y seed ejecutados dos veces sin duplicar usuarios ni cambiar IDs; claves foráneas validadas.');
@@ -68,7 +68,8 @@ try {
   assert.equal((await pool.query('SELECT count(*)::int AS n FROM sessions WHERE token_hash=$1', [digest(cookie.value)])).rows[0].n, 1);
   assert.equal((await pool.query('SELECT count(*)::int AS n FROM sessions WHERE token_hash=$1', [cookie.value])).rows[0].n, 0);
   assert.equal((await anonymous.get('/api/auth/admin', { headers: { Cookie: `petshop_session=${cookie.value}; role=administrador` } })).status(), 403);
-  assert.equal((await anonymous.get('/dashboard')).status(), 403);
+  assert.equal((await anonymous.get('/dashboard')).status(), 200);
+  assert.equal((await anonymous.get('/dashboard?section=catalog')).status(), 403);
   assert.equal((await post(anonymous, '/api/auth/register', { name: 'Duplicado', email: emails[0], password })).status(), 409);
   checks.push('Registro público, normalización de correo, duplicados y Argon2id; rol administrador rechazado; cookie HttpOnly/SameSite y token almacenado solo como hash.');
 
@@ -105,7 +106,8 @@ try {
     assert.equal(result.status(), 200);
     assert.equal((await result.json()).user.role, role);
     assert.equal((await seeded.get('/api/auth/admin')).status(), role === 'administrador' ? 200 : 403);
-    assert.equal((await seeded.get('/dashboard')).status(), role === 'administrador' ? 200 : 403);
+    assert.equal((await seeded.get('/dashboard')).status(), 200);
+    assert.equal((await seeded.get('/dashboard?section=catalog')).status(), role === 'administrador' ? 200 : 403);
     assert.equal((await post(seeded, '/api/auth/logout', {})).status(), 200);
   }
   const limitKey = `test-limit:${run}`;
@@ -198,8 +200,8 @@ try {
       await expect(page.locator('.auth-card [role="alert"]')).toHaveText('Las contraseñas no coinciden.');
       await page.getByLabel('Confirmar contraseña', { exact: true }).fill(password);
       await page.getByRole('button', { name: 'Crear mi cuenta', exact: true }).click();
-      await expect(page).toHaveURL(/login\/account/);
-      await expect(page.locator('.account-card')).toContainText('Usuario');
+      await expect(page).toHaveURL(/\/dashboard$/);
+      await expect(page.locator('header')).toContainText('Usuario');
       await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click();
       await expect(page).toHaveURL(/\/login$/);
       assert.equal(await page.evaluate(() => document.cookie.includes('petshop_session')), false);
@@ -209,8 +211,8 @@ try {
     await page.getByLabel('Correo electrónico', { exact: true }).fill(admin ? process.env.SEED_ADMIN_EMAIL! : process.env.SEED_USER_EMAIL!);
     await page.getByLabel('Contraseña', { exact: true }).fill(admin ? process.env.SEED_ADMIN_PASSWORD! : process.env.SEED_USER_PASSWORD!);
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-    await expect(page).toHaveURL(/login\/account/);
-    await expect(page.locator('.account-card')).toContainText(admin ? 'Administrador' : 'Usuario');
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.locator('header')).toContainText(admin ? 'Administrador' : 'Usuario');
     await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click();
     await expect(page).toHaveURL(/\/login$/);
     assert.deepEqual(errors, []);

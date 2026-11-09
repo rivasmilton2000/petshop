@@ -41,7 +41,7 @@ export function Layout({ children, page, title, description }: { children: React
         {navigation.map(([href, label]) => <Link key={href} href={href} className={router.pathname === href || (href.endsWith('shop') && page === 'product') ? 'is-active' : ''} aria-current={router.pathname === href ? 'page' : undefined} onClick={() => setMenu(false)}>{label}</Link>)}
       </nav>
       <div className="header__actions">
-        <Link className="access-link" href={user ? '/login/account' : '/login'} aria-label={user ? 'Mi cuenta' : 'Iniciar sesión'}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 22v-3a8 8 0 0 1 16 0v3" /></svg><span>{user ? 'Mi cuenta' : 'Ingresar'}</span></Link>
+        <Link className="access-link" href={user ? '/dashboard' : '/login'} aria-label={user ? 'Mi cuenta' : 'Iniciar sesión'}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 22v-3a8 8 0 0 1 16 0v3" /></svg><span>{user ? 'Mi cuenta' : 'Ingresar'}</span></Link>
         <button className="bag-button" type="button" aria-label={`Abrir carrito, ${cart.count} artículos`} aria-haspopup="dialog" onClick={() => { setMenu(false); cart.open(); }}>
           <svg viewBox="0 0 28 34" aria-hidden="true"><path d="M9 11V8a5 5 0 0 1 10 0v3M3 11h22l2 20a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2l2-20Z" fill="none" stroke="currentColor" strokeWidth="2" /></svg><span>{cart.count}</span>
         </button>

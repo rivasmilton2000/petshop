@@ -12,7 +12,7 @@ export default endpoint(async (req, res) => {
     const identity = await exchangeGoogleCode(req.query.code, flow.code_verifier, flow.nonce);
     const user = await googleUser(identity, flow.user_id);
     await createSession(req, res, user.id);
-    res.redirect(303, '/login/account');
+    res.redirect(303, '/dashboard');
   } catch (error) {
     setCookie(res, OAUTH_COOKIE, '', 0, '/api/auth/google');
     const code = error instanceof Error && error.message.startsWith('Inicia sesión con tu contraseña') ? 'google_link_required' : 'google_invalid';

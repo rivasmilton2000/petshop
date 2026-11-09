@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { products, productHref, productImage } from '@/pages/website/data/products';
+import { productHref, productImage, type Product } from '@/pages/website/data/products';
 
 type Item = { id: string; color: string; qty: number };
-type Cart = { items: Item[]; count: number; open: () => void; add: (item: Item) => void };
+type Cart = { items: Item[]; count: number; ready: boolean; open: () => void; add: (item: Item, product: Product) => void };
 const Context = createContext<Cart | null>(null);
 const KEY = 'petshop_cart';
 
-function readCart(): Item[] {
+function readCart(products: Product[]): Item[] {
   try {
     const raw: unknown = JSON.parse(localStorage.getItem(KEY) ?? '[]');
     if (!Array.isArray(raw)) return [];
@@ -31,16 +31,24 @@ export function useCart() {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<Item[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [ready, setReady] = useState(false);
   const [opened, setOpened] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    setItems(readCart());
-    setReady(true);
-    const sync = (event: StorageEvent) => { if (event.key === KEY || event.key === null) setItems(readCart()); };
+    let cancelled = false;
+    void fetch('/api/catalog', { cache: 'no-store' }).then(async (response) => {
+      if (!response.ok) throw new Error('Catálogo no disponible.');
+      const data = await response.json();
+      if (!cancelled) { setProducts(data.products); setItems(readCart(data.products)); setReady(true); }
+    }).catch(() => { /* No sobrescribir una selección guardada si falla la conexión. */ });
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
+    const sync = (event: StorageEvent) => { if (ready && (event.key === KEY || event.key === null)) setItems(readCart(products)); };
     window.addEventListener('storage', sync);
     return () => window.removeEventListener('storage', sync);
-  }, []);
+  }, [products, ready]);
   useEffect(() => {
     if (ready) { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch { /* Funciona también sin almacenamiento. */ } }
   }, [items, ready]);
@@ -51,14 +59,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [opened]);
   const count = items.reduce((sum, item) => sum + item.qty, 0);
   const open = () => setOpened(true);
-  const add = (item: Item) => {
+  const add = (item: Item, product: Product) => {
+    setProducts((current) => [...current.filter((row) => row.id !== product.id), product]);
     setItems((current) => {
       const found = current.find((it) => it.id === item.id && it.color === item.color);
       return found ? current.map((it) => it === found ? { ...it, qty: Math.min(99, it.qty + item.qty) } : it) : [...current, item];
     });
     open();
   };
-  return <Context.Provider value={{ items, count, open, add }}>
+  return <Context.Provider value={{ items, count, ready, open, add }}>
     {children}
     <dialog className="demo-cart" ref={dialog} aria-labelledby="cart-title" onCancel={() => setOpened(false)} onClose={() => setOpened(false)} onClick={(event) => {
       if (event.target !== dialog.current) return;
@@ -68,7 +77,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       <div className="demo-cart__head"><h2 id="cart-title">Carrito de ejemplo ({count})</h2><button type="button" className="icon-button" onClick={() => setOpened(false)} aria-label="Cerrar carrito">×</button></div>
       <p className="demo-note">Puedes guardar una selección de ejemplo. Las compras y los precios aún no están disponibles.</p>
       {items.length === 0 ? <p className="cart-empty">Tu carrito está vacío. ¡Encuentra una idea para tu compañero!</p> : <ul className="demo-cart__list">{items.map((item, index) => {
-        const product = products.find((p) => p.id === item.id)!;
+        const product = products.find((p) => p.id === item.id);
+        if (!product) return null;
         const image = product.colors?.find((c) => c.name === item.color)?.image ?? product.image;
         return <li key={`${item.id}-${item.color}`}>
           <img src={productImage(image)} alt="" width="72" height="72" />

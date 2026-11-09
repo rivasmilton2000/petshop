@@ -18,8 +18,10 @@
     "db:migrate": "node scripts/database/migrate.mjs",
     "db:check": "node scripts/database/check.mjs",
     "db:seed": "node --import tsx scripts/database/seed.ts",
+    "db:catalog": "node --import tsx scripts/database/catalog.ts",
     "test:auth": "node --import tsx scripts/test-auth.ts",
-    "test:auth-origins": "node --import tsx scripts/test-auth-origins.ts"
+    "test:auth-origins": "node --import tsx scripts/test-auth-origins.ts",
+    "test:dashboard": "node --import tsx scripts/test-dashboard.ts"
   },
   "dependencies": {
     "@fontsource/montserrat": "^5.2.8",

@@ -4,11 +4,15 @@ import { useRouter } from 'next/router';
 import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { ProductCard } from '@/components/ProductCard';
-import { categories, products } from './data/products';
+import { categories, type Product } from './data/products';
+import { publicCatalog } from '@/server/catalog';
 
-export const getServerSideProps: GetServerSideProps = async ({ query }) => ({ props: { initialCategory: typeof query.cat === 'string' && categories[query.cat] ? query.cat : 'all' } });
+export const getServerSideProps: GetServerSideProps = async ({ query, res }) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return { props: { initialCategory: typeof query.cat === 'string' && categories[query.cat] ? query.cat : 'all', products: await publicCatalog() } };
+};
 
-export default function Shop({ initialCategory }: { initialCategory: string }) {
+export default function Shop({ initialCategory, products }: { initialCategory: string; products: Product[] }) {
   const router = useRouter();
   const [filters, setFilters] = useState(false);
   const [search, setSearch] = useState('');
