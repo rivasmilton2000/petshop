@@ -1,0 +1,6 @@
+Generation mode: built-in image_gen.imagegen
+Asset: contact-dog-walk.png
+Transparent background: false
+
+Final prompt:
+Use case: photorealistic-natural. Asset type: square editorial photograph for a pet boutique Contact page. Primary request: a cropped person walking several dogs, holding multiple colorful pastel leashes against a seamless sky-blue studio background. Composition: square 1024x1024, person's hand enters upper left holding loops of sage green, burgundy, blush pink, sky blue and braided colorful leashes, their dark blue trouser leg and sneaker at far left; four friendly dogs of different sizes walking toward the right occupy the lower and right half, including a small dachshund, black French bulldog, golden and tricolor collie. Show entire paws on blue floor. Bright polished fashion pet campaign photography, natural fur, soft studio shadows. No text, no logos, no borders. This is a single photographic website asset, not a website screenshot.

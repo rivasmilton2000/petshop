@@ -89,32 +89,34 @@ $legales = ['Accessibility', 'Shipping', 'Refund', 'Terms', 'Privacy'];
 
     <link rel="stylesheet" href="./src/pages/website/css/website.css">
 </head>
-<body>
+<body class="page-home">
 
 <a class="skip-link" href="#contenido">Skip to content</a>
 
 <!-- ===== HEADER FLOTANTE TIPO PÍLDORA ===== -->
 <header class="header" id="site-header">
-    <a class="header__logo" href="./index.php" aria-label="Petshop – home">Petshop</a>
+    <div class="header-main">
+    <a class="header__logo brand-logo" href="./index.php" aria-label="Petshop – home">Petshop</a>
 
-    <nav class="header__nav" id="main-nav" aria-label="Main navigation">
-        <a href="./src/pages/website/about.php">About</a>
-        <a href="#shop">Shop</a>
-        <a href="#contact">Contact</a>
+    <nav class="header__nav nav-menu" id="main-nav" aria-label="Main navigation">
+        <a class="nav-link" href="./src/pages/website/about.php">ABOUT</a>
+        <a class="nav-link" href="./src/pages/website/shop.php">SHOP</a>
+        <a class="nav-link" href="./src/pages/website/contact.php">CONTACT</a>
     </nav>
 
-    <div class="header__actions">
-        <a class="header__login" id="btn-login" href="#login">
+    <div class="header__actions header-actions">
+        <a class="header__login nav-action-link" id="btn-login" href="#login">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11" fill="currentColor"/><circle cx="12" cy="9.5" r="3.6" fill="#FDF18F"/><path d="M4.8 19.2c1.4-3.3 4-4.9 7.2-4.9s5.8 1.6 7.2 4.9A10.9 10.9 0 0 1 12 23a10.9 10.9 0 0 1-7.2-3.8Z" fill="#FDF18F"/></svg>
             <span>Log In</span>
         </a>
-        <a class="header__bag" id="btn-cart" href="#cart" aria-label="Shopping bag, 0 items">
+        <button class="header__bag cart-btn" id="openCartBtn" type="button" aria-label="Abrir carrito" aria-haspopup="dialog" aria-controls="cartDrawer" aria-expanded="false">
             <svg viewBox="0 0 28 34" aria-hidden="true" focusable="false"><path d="M9 11V8a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M3 11h22l2 20a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2l2-20Z" fill="currentColor"/></svg>
-            <span class="header__bag-count">0</span>
-        </a>
+            <span class="header__bag-count cart-count">0</span>
+        </button>
         <button class="header__toggle" id="btn-menu" type="button" aria-expanded="false" aria-controls="main-nav" aria-label="Open menu">
             <span></span><span></span><span></span>
         </button>
+    </div>
     </div>
 </header>
 
@@ -330,6 +332,18 @@ $legales = ['Accessibility', 'Shipping', 'Refund', 'Terms', 'Privacy'];
     </div>
 </footer>
 
+<!-- Overlay y carrito lateral de la portada. -->
+<div class="cart-overlay" id="cartOverlay" aria-hidden="true"></div>
+<aside class="cart-drawer" id="cartDrawer" role="dialog" aria-modal="true" aria-labelledby="home-cart-title" aria-hidden="true" inert>
+    <div class="cart-drawer-header">
+        <h3 id="home-cart-title">Cart (0 items)</h3>
+        <button type="button" class="close-cart-btn" id="closeCartBtn" aria-label="Cerrar carrito">&times;</button>
+    </div>
+    <div class="cart-drawer-body">
+        <p class="empty-cart-msg">Your cart is empty.</p>
+    </div>
+</aside>
+
 <script>
     // Menú móvil de la cápsula
     (function () {
@@ -354,6 +368,47 @@ $legales = ['Accessibility', 'Shipping', 'Refund', 'Terms', 'Privacy'];
         }
         document.getElementById('btn-prev').addEventListener('click', function () { mover(-1); });
         document.getElementById('btn-next').addEventListener('click', function () { mover(1); });
+    })();
+
+    // Carrito: apertura, cierre, bloqueo de scroll y navegación por teclado.
+    (function () {
+        var cartBtn = document.getElementById('openCartBtn');
+        var drawer = document.getElementById('cartDrawer');
+        var overlay = document.getElementById('cartOverlay');
+        var closeBtn = document.getElementById('closeCartBtn');
+        var background = Array.from(document.querySelectorAll('body > .skip-link, body > header, body > main, body > footer'));
+        var previousFocus = null;
+
+        function toggleCart(isOpen) {
+            if (isOpen === drawer.classList.contains('is-open')) { return; }
+            if (isOpen) {
+                previousFocus = document.activeElement;
+                document.getElementById('site-header').classList.remove('is-open');
+                document.getElementById('btn-menu').setAttribute('aria-expanded', 'false');
+            }
+            drawer.inert = !isOpen;
+            drawer.classList.toggle('is-open', isOpen);
+            overlay.classList.toggle('is-open', isOpen);
+            document.body.classList.toggle('is-cart-open', isOpen);
+            drawer.setAttribute('aria-hidden', String(!isOpen));
+            cartBtn.setAttribute('aria-expanded', String(isOpen));
+            if (isOpen) { closeBtn.focus({ preventScroll: true }); }
+            background.forEach(function (element) { element.inert = isOpen; });
+            if (!isOpen && previousFocus) { previousFocus.focus({ preventScroll: true }); }
+        }
+
+        cartBtn.addEventListener('click', function () { toggleCart(true); });
+        closeBtn.addEventListener('click', function () { toggleCart(false); });
+        overlay.addEventListener('click', function () { toggleCart(false); });
+        document.addEventListener('keydown', function (event) {
+            if (!drawer.classList.contains('is-open')) { return; }
+            if (event.key === 'Escape') { toggleCart(false); }
+            // El estado vacío tiene un único control: mantener el foco dentro del diálogo.
+            if (event.key === 'Tab') {
+                event.preventDefault();
+                closeBtn.focus();
+            }
+        });
     })();
 </script>
 </body>
