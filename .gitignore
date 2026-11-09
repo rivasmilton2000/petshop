@@ -1,0 +1,11 @@
+node_modules/
+.next/
+out/
+.env*
+!.env.example
+*.tsbuildinfo
+public/img/
+public/website/img/
+public/website/css/
+artifacts/
+.migration-backup/
