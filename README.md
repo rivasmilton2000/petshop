@@ -39,6 +39,10 @@ npm.cmd run start
 
 Esta aplicación corre en Node.js. XAMPP/PHP ya no ejecuta las páginas del proyecto. Si se sirve bajo un dominio de Apache, el servidor debe reenviar las peticiones al proceso de Next.js; las redirecciones de esta aplicación se resuelven en ese proceso. No se modificó la configuración global de Apache.
 
+## Demo temporal para compartir
+
+Se prepararon `scripts/Start-Demo.ps1` y `scripts/Stop-Demo.ps1` para ejecutar Next.js en producción y publicar solo `127.0.0.1:3000` mediante un túnel HTTPS de Cloudflare, sin abrir puertos del router. El enlace activo está en `artifacts/demo/state.json`. Las instrucciones para compartir, mantener los procesos abiertos, apagar la demo y la configuración pendiente de Google están en [docs/DEMO-TEMPORAL.md](docs/DEMO-TEMPORAL.md). PostgreSQL y Apache quedan fuera del túnel.
+
 ## Estructura y rutas
 
 | Archivo | Ruta |
