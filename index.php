@@ -98,7 +98,7 @@ $legales = ['Accessibility', 'Shipping', 'Refund', 'Terms', 'Privacy'];
     <a class="header__logo" href="./index.php" aria-label="Petshop – home">Petshop</a>
 
     <nav class="header__nav" id="main-nav" aria-label="Main navigation">
-        <a href="#about">About</a>
+        <a href="./src/pages/website/about.php">About</a>
         <a href="#shop">Shop</a>
         <a href="#contact">Contact</a>
     </nav>
