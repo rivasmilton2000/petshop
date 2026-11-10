@@ -5,6 +5,7 @@ import { digest, getCookie, SESSION_COOKIE } from './auth';
 import { assertAdmin } from './catalog';
 import type { SessionUser } from '@/types/auth';
 import type { AccountRecord, OwnSession, Profile, Stats } from '@/pages/dashboard/types';
+import { releaseExpiredReservations } from './stock';
 
 export async function ownProfile(user: SessionUser): Promise<Profile> {
   const row = (await getDatabase().query<Profile>(`SELECT u.id,u.name,u.email,u.role,u.created_at::text AS "createdAt",
@@ -20,9 +21,11 @@ export async function ownSessions(user: SessionUser, req: Pick<IncomingMessage, 
 }
 export async function dashboardStats(user: SessionUser): Promise<Stats> {
   assertAdmin(user);
+  await releaseExpiredReservations();
   return (await getDatabase().query<Stats>(`SELECT (SELECT count(*)::int FROM catalog_products) AS products,
     (SELECT count(*)::int FROM catalog_products WHERE active AND archived_at IS NULL) AS visible,(SELECT count(*)::int FROM users) AS accounts,
-    (SELECT count(*)::int FROM catalog_products WHERE active AND archived_at IS NULL AND stock=0) AS "outOfStock"`)).rows[0];
+    (SELECT count(*)::int FROM catalog_products WHERE active AND archived_at IS NULL AND stock-reserved_stock=0) AS "outOfStock",
+    (SELECT count(*)::int FROM shop_orders WHERE status='paid_review') AS "paymentReviews"`)).rows[0];
 }
 export async function accountList(user: SessionUser): Promise<AccountRecord[]> {
   assertAdmin(user);

@@ -4,7 +4,7 @@ import { productHref, productImage, formatPrice, type Product } from '@/pages/we
 import { useAuthSession } from './AuthSession';
 import type { CartItem, CartQuote, PreparedCheckout } from '@/types/cart';
 
-type Cart = { items: CartItem[]; count: number; ready: boolean; open: () => void; add: (item: CartItem, product: Product) => Promise<void> };
+type Cart = { items: CartItem[]; products: Product[]; count: number; ready: boolean; open: () => void; add: (item: CartItem, product: Product) => Promise<void>; completeOrder: (id: string, purchased: CartItem[]) => void };
 const Context = createContext<Cart | null>(null);
 const KEY = 'petshop_cart';
 function readCart(): CartItem[] {
@@ -40,6 +40,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const mutation = useRef(false);
   const quoteGeneration = useRef(0);
+  const completedOrders = useRef(new Set<string>());
   const [error, setError] = useState('');
   const [quote, setQuote] = useState<CartQuote | null>(null);
   const [preparation, setPreparation] = useState<PreparedCheckout | null>(null);
@@ -93,7 +94,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setOpened(true);
   };
   const count = items.reduce((sum, item) => sum + item.qty, 0);
-  return <Context.Provider value={{ items, count, ready, open, add }}>
+  const completeOrder = (id: string, purchased: CartItem[]) => {
+    if (!ready || completedOrders.current.has(id)) return;
+    let processed: string[];
+    try { const saved=JSON.parse(localStorage.getItem('petshop_completed_orders') ?? '[]'); processed=Array.isArray(saved) ? saved.filter(value=>typeof value==='string') : []; } catch { processed=[]; }
+    if (processed.includes(id)) return;
+    completedOrders.current.add(id);
+    const next=currentItems.current.flatMap(item=>{ const bought=purchased.find(row=>row.id===item.id && row.color===item.color); const qty=item.qty-(bought?.qty ?? 0); return qty>0 ? [{...item,qty}] : []; });
+    commit(next); setQuote(null);
+    try { localStorage.setItem('petshop_completed_orders',JSON.stringify([...processed.slice(-99),id])); } catch { /* Storage is optional. */ }
+  };
+  return <Context.Provider value={{ items, products, count, ready, open, add, completeOrder }}>
     {children}
     <dialog className="demo-cart" ref={dialog} aria-labelledby="cart-title" onCancel={() => setOpened(false)} onClose={() => setOpened(false)} onClick={(event) => {
       if (event.target !== dialog.current) return;
@@ -101,7 +112,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) setOpened(false);
     }}>
       <div className="demo-cart__head"><h2 id="cart-title">Tu carrito ({count})</h2><button type="button" className="icon-button" onClick={() => setOpened(false)} aria-label="Cerrar carrito">×</button></div>
-      <p className="demo-note">Comprobamos precios y stock en la tienda. Añadir al carrito o preparar el pedido no reserva existencias.</p>
+      <p className="demo-note">Comprobamos precios y stock en la tienda. Las unidades se reservan al iniciar el pago en el checkout.</p>
       {error && <p className="form-error" role="alert">{error}</p>}
       {items.length === 0 ? <p className="cart-empty">Tu carrito está vacío. ¡Encuentra una idea para tu compañero!</p> : <ul className="demo-cart__list">{items.map((item, index) => {
         const product = products.find(product => product.id === item.id);
@@ -115,6 +126,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         </li>;
       })}</ul>}
       <div className="demo-cart__foot">{quote && items.length > 0 && <p aria-live="polite">Total de productos: {formatPrice(quote.totalCents / 100)}</p>}
+        {items.length>0 && <Link className="btn btn--wine" href="/website/checkout" onClick={()=>setOpened(false)}>Continuar al checkout</Link>}
         {items.length > 0 && (user ? <button className="btn btn--wine" type="button" disabled={busy} onClick={async () => {
           if (mutation.current) return;
           mutation.current = true; setBusy(true); setError(''); setPreparation(null);
@@ -127,7 +139,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           } catch (error) { setQuote(null); setError((error as Error).message); preparationKey.current = null; }
           finally { mutation.current = false; setBusy(false); }
         }}>{busy ? 'Comprobando…' : 'Preparar pedido'}</button> : <Link className="btn btn--wine" href="/login" onClick={() => setOpened(false)}>Ingresar para preparar pedido</Link>)}
-        {preparation && <p className="demo-note" role="status">Selección verificada. Referencia: {preparation.id}. La confirmación, envío y pago estarán disponibles en la siguiente etapa. El stock se comprobará de nuevo al confirmar.</p>}
+        {preparation && <p className="demo-note" role="status">Selección verificada. Referencia: {preparation.id}. Continúa al checkout para elegir la entrega y pagar con Wompi.</p>}
         <Link className="btn btn--wine" href="/website/shop" onClick={() => setOpened(false)}>Seguir explorando</Link>{items.length > 0 && <button className="text-button" disabled={busy} type="button" onClick={() => { void change([], true).catch(() => {}); }}>Vaciar carrito</button>}
       </div>
     </dialog>

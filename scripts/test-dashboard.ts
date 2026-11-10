@@ -104,7 +104,7 @@ try {
       await expect(page).toHaveTitle(/Inicio.*LILAC & TOFFEE$/);
       await page.evaluate(()=>document.fonts.ready);
       const nav=page.getByRole('navigation',{name:'Navegación del panel',includeHidden:true});
-      await expect(nav.locator('a')).toHaveCount(user.role==='administrador'?7:3);
+      await expect(nav.locator('a')).toHaveCount(user.role==='administrador'?8:4);
       if(user.role==='usuario') {await expect(nav.getByRole('link',{name:'Productos',exact:true})).toHaveCount(0);await expect(nav.getByRole('link',{name:'Cuentas',exact:true})).toHaveCount(0);}
       expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
       await page.screenshot({path:`artifacts/dashboard-${user.role}-${width}-overview.png`,fullPage:true});

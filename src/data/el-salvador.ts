@@ -81,12 +81,17 @@ const rows: [string, [string, string[]][]][] = [
     ['La Unión Sur', ['Conchagua','El Carmen','Intipucá','La Unión','Meanguera del Golfo','San Alejo','Yayantique','Yucuaiquín']],
   ]],
 ];
-export const territories: Department[] = rows.map(([name, municipalities]) => ({ id: slug(name), name, municipalities: municipalities.map(([name, districts]) => ({ id: slug(name), name, districts: districts.map(name => ({ id: `${slug(name === 'San Salvador y Capital de la República' ? 'San Salvador' : name)}--${slug(name === 'San Salvador y Capital de la República' ? 'San Salvador Centro' : '')}`, name })) })) }));
-// Qualify district IDs by municipality: several historical names are repeated.
-for (const department of territories) for (const municipality of department.municipalities) for (const district of municipality.districts) {
-  district.id = `${municipality.id}--${slug(district.name === 'San Salvador y Capital de la República' ? 'San Salvador' : district.name)}`;
-  if (district.name === 'San Salvador y Capital de la República') district.aliases = ['San Salvador'];
-}
+export const territories: Department[] = rows.map(([name, municipalities]) => ({
+  id: slug(name), name,
+  municipalities: municipalities.map(([name, districts]) => ({
+    id: slug(name), name,
+    districts: districts.map(district => ({
+      id: `${slug(name)}--${slug(district === 'San Salvador y Capital de la República' ? 'San Salvador' : district)}`,
+      name: district,
+      ...(district === 'San Salvador y Capital de la República' ? { aliases: ['San Salvador'] } : {}),
+    })),
+  })),
+}));
 export function findTerritory(departmentId: unknown, municipalityId: unknown, districtId: unknown) {
   const department = territories.find(department => department.id === departmentId);
   const municipality = department?.municipalities.find(municipality => municipality.id === municipalityId);

@@ -7,8 +7,9 @@ import { validSlug } from './catalog';
 import type { Product } from '@/pages/website/data/products';
 import type { CartItem, CartQuote, PreparedCheckout } from '@/types/cart';
 import type { SessionUser } from '@/types/auth';
+import { releaseExpiredReservations } from './stock';
 
-function parseItems(raw: unknown): CartItem[] {
+export function parseItems(raw: unknown): CartItem[] {
   if (!Array.isArray(raw) || raw.length > 100) throw new HttpError(400, 'El carrito admite hasta 100 líneas.');
   const merged = new Map<string, CartItem>();
   for (const entry of raw) {
@@ -21,13 +22,13 @@ function parseItems(raw: unknown): CartItem[] {
   return [...merged.values()].sort((a,b) => a.id.localeCompare(b.id) || a.color.localeCompare(b.color));
 }
 
-async function quote(client: PoolClient, items: CartItem[]): Promise<CartQuote> {
+export async function quote(client: PoolClient, items: CartItem[], exclusive = false): Promise<CartQuote> {
   const ids = [...new Set(items.map(item => item.id))].sort();
   // Stable locking order; admin stock/price changes wait until validation finishes.
-  await client.query('SELECT id FROM catalog_products WHERE id=ANY($1::text[]) ORDER BY id FOR SHARE', [ids]);
+  await client.query(`SELECT id FROM catalog_products WHERE id=ANY($1::text[]) ORDER BY id ${exclusive ? 'FOR UPDATE' : 'FOR SHARE'}`, [ids]);
   // Read variants in a fresh statement after acquiring the product locks, so a
   // concurrent product edit cannot mix the new stock with an older variant list.
-  const result = await client.query<Product & { active: boolean; archived: boolean }>(`SELECT p.id,p.name,p.category,p.animals,p.image,p.description,p.price::float8 AS price,p.stock,p.active,p.archived_at IS NOT NULL AS archived,
+  const result = await client.query<Product & { active: boolean; archived: boolean }>(`SELECT p.id,p.name,p.category,p.animals,p.image,p.description,p.price::float8 AS price,(p.stock-p.reserved_stock) AS stock,p.active,p.archived_at IS NOT NULL AS archived,
     COALESCE((SELECT json_agg(json_build_object('name',v.name,'image',v.image) ORDER BY v.position) FROM catalog_variants v WHERE v.product_id=p.id),'[]') AS colors
     FROM catalog_products p WHERE p.id=ANY($1::text[]) ORDER BY p.id`, [ids]);
   const products = result.rows.map(({ active: _active, archived: _archived, ...product }) => ({ ...product, ...(product.colors?.length ? {} : { colors: undefined }) }));
@@ -52,6 +53,7 @@ async function quote(client: PoolClient, items: CartItem[]): Promise<CartQuote> 
 }
 
 export async function validateCart(raw: unknown): Promise<CartQuote> {
+  await releaseExpiredReservations();
   const items = parseItems(raw);
   const client = await getDatabase().connect();
   try {
@@ -64,6 +66,7 @@ export async function validateCart(raw: unknown): Promise<CartQuote> {
 }
 
 export async function prepareCheckout(user: SessionUser, raw: unknown, key: unknown): Promise<PreparedCheckout> {
+  await releaseExpiredReservations();
   const items = parseItems(raw);
   if (!items.length) throw new HttpError(400, 'Añade productos al carrito antes de preparar el pedido.');
   if (typeof key !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key)) throw new HttpError(400, 'Falta una clave válida de preparación.');

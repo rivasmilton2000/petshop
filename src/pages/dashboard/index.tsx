@@ -10,6 +10,7 @@ import { getSessionUser } from '@/server/auth';
 import { ownProfile, ownSessions, dashboardStats, accountList } from '@/server/dashboard';
 import { adminCatalog, catalogCategories } from '@/server/catalog';
 import { googleAvailable } from '@/server/google';
+import { listOrders, paymentReviews } from '@/server/orders';
 import { productHref, productImage, formatPrice } from '../website/data/products';
 import { adminSections, sections, animalOptions, productImages, type Section, type DashboardProps, type CatalogRecord, type CatalogInput, type Profile, type OwnSession, type AccountRecord } from './types';
 import styles from './dashboard.module.css';
@@ -31,10 +32,12 @@ export const getServerSideProps: GetServerSideProps<DashboardProps> = async ({ r
     catalog: ['catalog','inventory','notifications'].includes(section) && !forbidden ? await adminCatalog(user) : [],
     categories: section === 'catalog' && !forbidden ? await catalogCategories() : [],
     accounts: section === 'users' && !forbidden ? await accountList(user) : [],
+    orders: section === 'orders' && !forbidden ? await listOrders(user) : [],
+    orderReviews: section === 'notifications' && user.role === 'administrador' && !forbidden ? await paymentReviews() : [],
   } };
 };
 
-const labels: Record<Section, string> = { overview: 'Inicio', profile: 'Mi perfil', security: 'Seguridad', catalog: 'Productos', inventory: 'Inventario', notifications: 'Notificaciones', users: 'Cuentas' };
+const labels: Record<Section, string> = { overview: 'Inicio', profile: 'Mi perfil', security: 'Seguridad', orders: 'Pedidos', catalog: 'Productos', inventory: 'Inventario', notifications: 'Notificaciones', users: 'Cuentas' };
 const panelHref = (section: Section) => section === 'overview' ? '/dashboard' : `/dashboard?section=${section}`;
 const date = (value: string) => new Intl.DateTimeFormat('es-SV', { dateStyle: 'medium', timeZone: 'America/El_Salvador' }).format(new Date(value));
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -62,7 +65,7 @@ function DashboardLayout({ data, children }: { data: DashboardProps; children: R
     <aside className={styles.sidebar} onKeyDown={event => { if (event.key === 'Escape') { setMenu(false); document.getElementById('dashboard-menu-toggle')?.focus(); } }}>
       <Link href="/" className={styles.brand}><img src="/img/LILAC%26TOFEE_LOGO.png" alt="" width="74" height="74" /><span>{BRAND}</span></Link>
       <div className={styles.menuHeader}><p className={styles.eyebrow}>Tu espacio</p><button id="dashboard-menu-toggle" className={styles.menuToggle} type="button" aria-label={menu ? 'Cerrar menú del panel' : 'Abrir menú del panel'} aria-controls="dashboard-nav" aria-expanded={menu} onClick={() => setMenu(!menu)}>☰</button></div>
-      <nav id="dashboard-nav" className={`${styles.nav} ${menu ? styles.navOpen : ''}`} aria-label="Navegación del panel">{entries.map((section) => <Link key={section} href={panelHref(section)} className={data.section === section ? styles.active : ''} aria-current={data.section === section ? 'page' : undefined}><span aria-hidden="true">{section === 'overview' ? '⌂' : section === 'profile' ? '♡' : section === 'security' ? '◈' : section === 'catalog' ? '▦' : section === 'inventory' ? '▤' : section === 'notifications' ? '♧' : '◎'}</span>{labels[section]}{section === 'notifications' && Boolean(data.stats?.outOfStock) && <small className={styles.notificationCount}>{data.stats?.outOfStock}</small>}</Link>)}</nav>
+      <nav id="dashboard-nav" className={`${styles.nav} ${menu ? styles.navOpen : ''}`} aria-label="Navegación del panel">{entries.map((section) => <Link key={section} href={panelHref(section)} className={data.section === section ? styles.active : ''} aria-current={data.section === section ? 'page' : undefined}><span aria-hidden="true">{section === 'overview' ? '⌂' : section === 'profile' ? '♡' : section === 'security' ? '◈' : section === 'catalog' ? '▦' : section === 'inventory' ? '▤' : section === 'notifications' ? '♧' : '◎'}</span>{labels[section]}{section === 'notifications' && Boolean((data.stats?.outOfStock ?? 0)+(data.stats?.paymentReviews ?? 0)) && <small className={styles.notificationCount}>{(data.stats?.outOfStock ?? 0)+(data.stats?.paymentReviews ?? 0)}</small>}</Link>)}</nav>
       <div className={styles.sidebarNote}><Motif kind="heart" /><p>Para cada huella,<br />un poquito de amor.</p><Link href="/website/shop">Volver a la tienda ↗</Link></div>
     </aside>
     <div className={styles.workspace}><header className={styles.topbar}><div><span className={styles.eyebrow}>Mi espacio / {labels[data.section]}</span><p>Bienvenido, {data.user.name.split(' ')[0]}</p></div><div className={styles.topActions}><Link href="/website/shop">Ver tienda ↗</Link><span className={styles.role}>{data.user.role === 'administrador' ? 'Administrador' : 'Usuario'}</span><button type="button" disabled={busy} onClick={async () => {
@@ -79,7 +82,7 @@ function DashboardLayout({ data, children }: { data: DashboardProps; children: R
 
 function Overview({ data }: { data: DashboardProps }) {
   const admin = data.user.role === 'administrador';
-  return <><section className={styles.welcome}><div><p className={styles.eyebrow}>{admin ? 'El cuidado empieza en los detalles' : 'Qué gusto tenerte aquí'}</p><h1>{admin ? 'Tu tienda, de un vistazo' : 'Un espacio para ti y tu compañero'}</h1><p>{admin ? 'Organiza el catálogo y consulta las cuentas de tu tienda desde un mismo lugar.' : 'Actualiza tu perfil y revisa los accesos de tu cuenta, con todo a mano.'}</p><Link className={styles.primary} href={panelHref(admin ? 'catalog' : 'profile')}>{admin ? 'Gestionar catálogo' : 'Ver mi perfil'} ↗</Link></div><div className={styles.welcomeArt}><img src="/img/LILAC%26TOFEE_LOGO.png" alt="Logo de LILAC & TOFFEE - PET SHOP" width="210" height="210" /><Motif /><Motif kind="heart" /></div></section>
+  return <><section className={styles.welcome}><div><p className={styles.eyebrow}>{admin ? 'El cuidado empieza en los detalles' : 'Qué gusto tenerte aquí'}</p><h1>{admin ? 'Tu tienda, de un vistazo' : 'Un espacio para ti y tu compañero'}</h1><p>{admin ? 'Organiza el catálogo, los pedidos y las cuentas de tu tienda desde un mismo lugar.' : 'Actualiza tu perfil y revisa los accesos de tu cuenta, con todo a mano.'}</p><Link className={styles.primary} href={panelHref(admin ? 'catalog' : 'profile')}>{admin ? 'Gestionar catálogo' : 'Ver mi perfil'} ↗</Link></div><div className={styles.welcomeArt}><img src="/img/LILAC%26TOFEE_LOGO.png" alt="Logo de LILAC & TOFFEE - PET SHOP" width="210" height="210" /><Motif /><Motif kind="heart" /></div></section>
     <div className={styles.stats}>{admin && data.stats ? <><Stat label="Productos del catálogo" value={data.stats.products} detail="Registros guardados en la tienda" /><Stat label="Visibles en la tienda" value={data.stats.visible} detail="Incluidos en el catálogo público" /><Stat label="Cuentas registradas" value={data.stats.accounts} detail="Usuarios y administradores" /></> : <><Stat label="Tu cuenta" value="Usuario" detail={`Creada el ${date(data.profile.createdAt)}`} /><Stat label="Sesiones activas" value={data.sessions.length} detail="Solo los accesos de tu cuenta" /><Stat label="Acceso con Google" value={data.profile.googleLinked ? 'Vinculado' : 'Sin vincular'} detail="Consulta tus opciones de seguridad" /></>}</div>
     <div className={styles.sectionTitle}><h2>Todo a tu alcance</h2><p>{admin ? 'Herramientas conectadas con los registros de tu tienda.' : 'Unos pequeños ajustes para sentirte en casa.'}</p></div><div className={styles.shortcuts}>{(admin ? ['catalog', 'users', 'profile', 'security'] as Section[] : ['profile', 'security'] as Section[]).map((section) => <Link className={styles.shortcut} href={panelHref(section)} key={section}><Motif kind={section === 'catalog' ? 'bone' : section === 'profile' ? 'heart' : 'paw'} /><h3>{labels[section]}</h3><p>{section === 'catalog' ? 'Crea, edita y administra precios, stock y visibilidad.' : section === 'users' ? 'Consulta las cuentas registradas y sus tipos de acceso.' : section === 'profile' ? 'Revisa tus datos y actualiza cómo quieres que te llamemos.' : 'Revisa tus sesiones y cierra los demás accesos.'}</p><span>Explorar →</span></Link>)}</div>
     {admin && <Link className={styles.inventorySummary} href={panelHref('notifications')}>Productos activos agotados: {data.stats?.outOfStock ?? 0}. Revisar notificaciones →</Link>}
@@ -159,7 +162,7 @@ function RemoveProductButton({ product, onRemoved }: { product: CatalogRecord; o
   }}>{busy ? 'Retirando…' : 'Eliminar producto'}</button><Notice error>{error}</Notice></div>;
 }
 
-function InventoryPanel({ products, notifications }: { products: CatalogRecord[]; notifications: boolean }) {
+function InventoryPanel({ products, notifications, reviews=[] }: { products: CatalogRecord[]; notifications: boolean; reviews?: DashboardProps['orderReviews'] }) {
   const [rows, setRows] = useState(products);
   const [editing, setEditing] = useState<string | null>(null);
   const [editingVersion, setEditingVersion] = useState(0);
@@ -175,14 +178,15 @@ function InventoryPanel({ products, notifications }: { products: CatalogRecord[]
     const timer = window.setInterval(refresh, 30000);
     return () => { window.removeEventListener('focus', refresh); clearInterval(timer); };
   }, [router]);
-  const visible = notifications ? rows.filter(product => product.active && product.stock === 0) : rows;
+  const visible = notifications ? rows.filter(product => product.active && product.stock-product.reservedStock === 0) : rows;
   return <><PanelHeading eyebrow="Administración" title={notifications ? 'Notificaciones' : 'Inventario'} text={notifications ? 'Una alerta por cada producto activo agotado. Se elimina automáticamente al reponer o retirar el producto.' : 'Consulta las existencias y actualiza el stock total de cada producto.'} />
     <Notice>{message}</Notice><Notice error>{error}</Notice>
+    {notifications&&reviews.length>0&&<section className={styles.card} aria-label="Pagos aprobados por revisar"><h2>Pagos aprobados por revisar</h2><p>Estos pedidos tienen un pago verificado que necesita revisión antes de entregar. No solicites otro pago al cliente.</p>{reviews.map(order=><p key={order.id}><Link className={styles.linkButton} href={`/website/order?id=${order.id}`}>Revisar pedido {order.id} · {formatPrice(order.totalCents/100)}</Link></p>)}</section>}
     <section className={styles.card} aria-label={notifications ? 'Alertas de inventario' : 'Existencias de productos'}>
       <div className={styles.cardHeading}><h2>{notifications ? 'Productos agotados' : 'Control de existencias'}</h2><span className={styles.badge}>{visible.length}</span></div>
       {!visible.length && <p role="status" className={styles.empty}>{notifications ? 'No hay productos activos agotados.' : 'No hay productos en el inventario.'}</p>}
       {visible.map(product => <article className={`${styles.productRow} ${notifications ? styles.inventoryAlert : ''}`} key={product.id} data-product-id={product.id}>
-        <img src={productImage(product.image)} alt="" width="80" height="80" /><div><h3>{product.name}</h3><p>{formatPrice(product.price)} · Stock: {product.stock}</p><span className={styles.badge}>{product.stock === 0 ? 'Agotado' : 'Disponible'}{!product.active ? ' · Oculto' : ''}</span></div>
+        <img src={productImage(product.image)} alt="" width="80" height="80" /><div><h3>{product.name}</h3><p>{formatPrice(product.price)} · Stock: {product.stock} · Reservadas: {product.reservedStock} · Disponibles: {product.stock-product.reservedStock}</p><span className={styles.badge}>{product.stock-product.reservedStock === 0 ? 'Agotado' : 'Disponible'}{!product.active ? ' · Oculto' : ''}</span></div>
         <div className={styles.rowActions}><button className={styles.secondary} type="button" disabled={busy} onClick={() => { setEditing(product.id); setEditingVersion(product.version); setStock(product.stock); setError(''); setMessage(''); }}>Reponer stock</button><RemoveProductButton product={product} onRemoved={() => { setRows(current => current.filter(row => row.id !== product.id)); setMessage('Producto retirado; historial conservado.'); void router.replace(router.asPath, undefined, { scroll: false }); }} /></div>
         {editing === product.id && <form className={`${styles.form} ${styles.stockForm}`} onSubmit={async event => {
           event.preventDefault(); setBusy(true); setError('');
@@ -198,6 +202,11 @@ function InventoryPanel({ products, notifications }: { products: CatalogRecord[]
   </>;
 }
 
+function OrdersPanel({ orders }: { orders: DashboardProps['orders'] }) {
+  const statuses={pending:'Pago pendiente',paid:'Pago aprobado',failed:'Pago fallido',expired:'Intento vencido',paid_review:'Pago aprobado · Revisar entrega'};
+  return <><PanelHeading eyebrow="Tus compras" title="Pedidos" text="Consulta el estado verificado de los pagos y el detalle de cada pedido." /><section className={styles.card}>{orders.length?orders.map(order=><article key={order.id} className={styles.orderRow}><h2>{statuses[order.status]}</h2><p>{formatPrice(order.totalCents/100)} · {date(order.createdAt)}</p><Link className={styles.linkButton} href={`/website/order?id=${order.id}`}>Ver pedido {order.id}</Link></article>):<p>Todavía no hay pedidos para mostrar.</p>}</section></>;
+}
+
 function AccountsPanel({ accounts }: { accounts: AccountRecord[] }) {
   const [search, setSearch] = useState('');
   const visible = accounts.filter((account) => `${account.name} ${account.email}`.toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es')));
@@ -205,5 +214,5 @@ function AccountsPanel({ accounts }: { accounts: AccountRecord[] }) {
 }
 
 export default function Dashboard(data: DashboardProps) {
-  return <DashboardLayout data={data}>{data.forbidden ? <section className={styles.card}><PanelHeading eyebrow="Acceso restringido" title="Esta función no está disponible para tu cuenta" text="Puedes consultar tus datos desde tu perfil o continuar explorando la tienda." /><Link className={styles.primary} href="/dashboard">Volver al inicio</Link></section> : data.section === 'profile' ? <ProfilePanel profile={data.profile} /> : data.section === 'security' ? <SecurityPanel sessions={data.sessions} profile={data.profile} googleEnabled={data.googleEnabled} /> : data.section === 'catalog' ? <CatalogPanel products={data.catalog} categories={data.categories} /> : data.section === 'inventory' || data.section === 'notifications' ? <InventoryPanel products={data.catalog} notifications={data.section === 'notifications'} /> : data.section === 'users' ? <AccountsPanel accounts={data.accounts} /> : <Overview data={data} />}</DashboardLayout>;
+  return <DashboardLayout data={data}>{data.forbidden ? <section className={styles.card}><PanelHeading eyebrow="Acceso restringido" title="Esta función no está disponible para tu cuenta" text="Puedes consultar tus datos desde tu perfil o continuar explorando la tienda." /><Link className={styles.primary} href="/dashboard">Volver al inicio</Link></section> : data.section === 'profile' ? <ProfilePanel profile={data.profile} /> : data.section === 'security' ? <SecurityPanel sessions={data.sessions} profile={data.profile} googleEnabled={data.googleEnabled} /> : data.section === 'catalog' ? <CatalogPanel products={data.catalog} categories={data.categories} /> : data.section === 'inventory' || data.section === 'notifications' ? <InventoryPanel products={data.catalog} notifications={data.section === 'notifications'} reviews={data.orderReviews} /> : data.section === 'orders' ? <OrdersPanel orders={data.orders} /> : data.section === 'users' ? <AccountsPanel accounts={data.accounts} /> : <Overview data={data} />}</DashboardLayout>;
 }

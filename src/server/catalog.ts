@@ -5,25 +5,29 @@ import { HttpError } from './api';
 import type { SessionUser } from '@/types/auth';
 import { animalOptions, productImages, type CatalogInput, type CatalogRecord } from '@/pages/dashboard/types';
 import type { Product } from '@/pages/website/data/products';
+import { releaseExpiredReservations } from './stock';
 
 const select = `SELECT p.id,p.name,p.category,p.animals,p.image,p.description,p.price::float8 AS price,
-  p.stock,p.active,p.archived_at::text AS "archivedAt",p.is_demo AS "isDemo",p.version,p.updated_at::text AS "updatedAt",
+  p.stock,p.reserved_stock AS "reservedStock",p.active,p.archived_at::text AS "archivedAt",p.is_demo AS "isDemo",p.version,p.updated_at::text AS "updatedAt",
   COALESCE((SELECT json_agg(json_build_object('name',v.name,'image',v.image) ORDER BY v.position)
     FROM catalog_variants v WHERE v.product_id=p.id),'[]') AS colors FROM catalog_products p`;
-export const publicProduct = (row: CatalogRecord): Product => ({ id: row.id, name: row.name, category: row.category, animals: row.animals, image: row.image, description: row.description, price: row.price, stock: row.stock, ...(row.colors?.length ? { colors: row.colors } : {}) });
+export const publicProduct = (row: CatalogRecord): Product => ({ id: row.id, name: row.name, category: row.category, animals: row.animals, image: row.image, description: row.description, price: row.price, stock: row.stock - row.reservedStock, ...(row.colors?.length ? { colors: row.colors } : {}) });
 export const assertAdmin = (user: SessionUser) => { if (user.role !== 'administrador') throw new HttpError(403, 'Esta función requiere permisos de administrador.'); };
 export const validSlug = (id: unknown): id is string => typeof id === 'string' && id.length <= 100 && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(id);
 export async function publicCatalog(): Promise<Product[]> {
+  await releaseExpiredReservations();
   const result = await getDatabase().query<CatalogRecord>(`${select} WHERE p.active AND p.archived_at IS NULL ORDER BY p.position,p.id`);
   return result.rows.map(publicProduct);
 }
 export async function publicProductById(id: string): Promise<Product | null> {
+  await releaseExpiredReservations();
   const result = await getDatabase().query<CatalogRecord>(`${select} WHERE p.active AND p.archived_at IS NULL AND p.id=$1`, [id]);
   return result.rows[0] ? publicProduct(result.rows[0]) : null;
 }
 export async function catalogCategories() { return (await getDatabase().query<{ id: string; name: string }>('SELECT id,name FROM catalog_categories ORDER BY name')).rows; }
 export async function adminCatalog(user: SessionUser): Promise<CatalogRecord[]> {
   assertAdmin(user);
+  await releaseExpiredReservations();
   return (await getDatabase().query<CatalogRecord>(`${select} WHERE p.archived_at IS NULL ORDER BY p.position,p.id`)).rows;
 }
 export async function adminProduct(user: SessionUser, id: string) {
@@ -72,10 +76,11 @@ export async function saveProduct(user: SessionUser, body: Record<string, unknow
     await client.query('BEGIN');
     let previousStock = 0;
     if (id) {
-      const previous = await client.query<{ stock: number; archived_at: string | null }>('SELECT stock,archived_at FROM catalog_products WHERE id=$1 FOR UPDATE', [id]);
+      const previous = await client.query<{ stock: number; reserved_stock: number; archived_at: string | null }>('SELECT stock,reserved_stock,archived_at FROM catalog_products WHERE id=$1 FOR UPDATE', [id]);
       if (!previous.rowCount) throw new HttpError(404, 'No encontramos ese producto.');
       if (previous.rows[0].archived_at) throw new HttpError(410, 'El producto fue retirado del catálogo.');
       previousStock = previous.rows[0].stock;
+      if (value.stock < previous.rows[0].reserved_stock) throw new HttpError(409, 'No puedes reducir el stock por debajo de las unidades reservadas para pagos pendientes.');
       const changed = await client.query(`UPDATE catalog_products SET name=$2,category=$3,animals=$4,image=$5,description=$6,
         active=$7,version=version+1,updated_by=$8,updated_at=now(),price=$10,stock=$11,is_demo=false WHERE id=$1 AND version=$9 RETURNING id`,
       [id,value.name,value.category,value.animals,value.image,value.description,value.active,user.id,value.version,value.price,value.stock]);
@@ -101,7 +106,8 @@ export async function saveProduct(user: SessionUser, body: Record<string, unknow
 export async function inventoryNotifications(user: SessionUser) {
   assertAdmin(user);
   // One row per product; never insert notification records on reload.
-  return (await getDatabase().query<CatalogRecord>(`${select} WHERE p.active AND p.archived_at IS NULL AND p.stock=0 ORDER BY p.name,p.id`)).rows;
+  await releaseExpiredReservations();
+  return (await getDatabase().query<CatalogRecord>(`${select} WHERE p.active AND p.archived_at IS NULL AND p.stock-p.reserved_stock=0 ORDER BY p.name,p.id`)).rows;
 }
 
 export async function replenishStock(user: SessionUser, body: Record<string, unknown>) {
@@ -111,11 +117,12 @@ export async function replenishStock(user: SessionUser, body: Record<string, unk
   const client = await getDatabase().connect();
   try {
     await client.query('BEGIN');
-    const result = await client.query<{ stock: number; version: number; archived_at: string | null }>('SELECT stock,version,archived_at FROM catalog_products WHERE id=$1 FOR UPDATE', [body.id]);
+    const result = await client.query<{ stock: number; reserved_stock: number; version: number; archived_at: string | null }>('SELECT stock,reserved_stock,version,archived_at FROM catalog_products WHERE id=$1 FOR UPDATE', [body.id]);
     const row = result.rows[0];
     if (!row) throw new HttpError(404, 'No encontramos ese producto.');
     if (row.archived_at) throw new HttpError(410, 'El producto fue retirado.');
     if (row.version !== body.version) throw new HttpError(409, 'El inventario cambió. Actualiza la lista antes de reponer.');
+    if (body.stock < row.reserved_stock) throw new HttpError(409, 'Hay unidades reservadas para pagos pendientes. El stock total no puede ser menor que la reserva.');
     await client.query('UPDATE catalog_products SET stock=$2,version=version+1,updated_by=$3,updated_at=now() WHERE id=$1', [body.id,body.stock,user.id]);
     if (row.stock !== body.stock) await client.query('INSERT INTO inventory_movements(id,product_id,previous_stock,new_stock,changed_by,reason) VALUES ($1,$2,$3,$4,$5,$6)', [randomUUID(),body.id,row.stock,body.stock,user.id,'replenished']);
     await client.query('COMMIT');

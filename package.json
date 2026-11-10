@@ -23,7 +23,9 @@
     "test:auth": "node --import tsx scripts/test-auth.ts",
     "test:auth-origins": "node --import tsx scripts/test-auth-origins.ts",
     "test:dashboard": "node --import tsx scripts/test-dashboard.ts",
-    "test:inventory": "node --import tsx scripts/test-inventory.ts"
+    "test:inventory": "node --import tsx scripts/test-inventory.ts",
+    "checkout:reconcile": "node --import tsx scripts/checkout-reconcile.ts",
+    "test:checkout": "node --import tsx scripts/test-checkout.ts"
   },
   "dependencies": {
     "@fontsource/montserrat": "^5.2.8",
