@@ -1,6 +1,6 @@
 # LILAC & TOFFEE - PET SHOP
 
-Etapas 1, 2, 3 y ampliación de inventario terminadas: tienda en Next.js 16, React 19 y TypeScript usando **Pages Router**, con autenticación, dashboard compartido por roles y catálogo en PostgreSQL. La implementación de la portada está en `index.tsx`, junto a `package.json`, y las demás páginas de la tienda permanecen en `src/pages/website`, con estilos en `src/pages/website/css/website.css`. Se conservan la plantilla editorial, el logo y las imágenes. Google está implementado; falta probar el proveedor real cuando se configuren sus credenciales.
+Tienda, autenticación, inventario y checkout implementados (Wompi real pendiente de credenciales): tienda en Next.js 16, React 19 y TypeScript usando **Pages Router**, con autenticación, dashboard compartido por roles y catálogo en PostgreSQL. La implementación de la portada está en `index.tsx`, junto a `package.json`, y las demás páginas de la tienda permanecen en `src/pages/website`, con estilos en `src/pages/website/css/website.css`. Se conservan la plantilla editorial, el logo y las imágenes. Google está implementado; falta probar el proveedor real cuando se configuren sus credenciales.
 
 ## Ejecutar en Windows
 
@@ -94,11 +94,11 @@ Los recursos originales siguen en `img/` y `src/pages/website/img/`. `npm run as
 
 Se aplica la paleta `#B69BC1`, `#AD7653`, `#F7EEE7`, `#493234`, `#E8CFCC`, `#FFFFFF`, con huella, hueso y corazón como detalles. El nombre exacto de la marca aparece en cabecera, pie y metadatos. La navegación y el contenido están en español.
 
-El catálogo original estaba identificado como ejemplo. Sus nueve slugs, textos, imágenes y variantes se importan de forma repetible a PostgreSQL mediante `db:catalog`, sin sobrescribir posteriores ediciones del administrador. Sus precios siguen siendo `null`. Portada, catálogo y detalle consultan solo los productos visibles de la base. No se publican ofertas, testimonios, certificaciones, contactos, horarios, direcciones, mapas ni condiciones comerciales ficticias. El carrito conserva la selección en el navegador y verifica precios y stock en PostgreSQL al modificarla y preparar un pedido. Se guardan preparaciones verificadas, sin reservar existencias, confirmar ventas ni procesar pagos. El formulario de contacto prepara un texto para copiar y no envía ni persiste datos personales.
+El catálogo original estaba identificado como ejemplo. Sus nueve slugs, textos, imágenes y variantes se importan de forma repetible a PostgreSQL mediante `db:catalog`, sin sobrescribir posteriores ediciones del administrador. Sus precios siguen siendo `null`. Portada, catálogo y detalle consultan solo los productos visibles de la base. No se publican ofertas, testimonios, certificaciones, contactos, horarios, direcciones, mapas ni condiciones comerciales ficticias. El carrito conserva la selección en el navegador y verifica precios y stock en PostgreSQL al modificarla y preparar un pedido. El checkout añade entrega/recogida y pago alojado con Wompi SV. Al iniciar el pago se reserva stock; solo una confirmación verificada por el servidor lo descuenta. Las preparaciones anteriores siguen siendo comprobaciones sin reserva. El formulario de contacto prepara un texto para copiar y no envía ni persiste datos personales.
 
 **PostgreSQL gestiona autenticación y catálogo.** El registro público asigna exclusivamente el rol `usuario`; las contraseñas usan Argon2id. Las sesiones de siete días se guardan mediante hashes de tokens aleatorios, con cookie HttpOnly. El rol se consulta en el servidor en cada acceso protegido. El seed repetible prepara una cuenta `usuario` y otra `administrador`, con credenciales tomadas de las variables `SEED_*` de `.env.local`.
 
-Ambos roles se dirigen a `/dashboard`: el usuario consulta/edita su perfil y administra sus propias sesiones; el administrador añade Productos, Inventario, Notificaciones y consulta de cuentas reales. Administra precios y stock; los productos agotados siguen visibles y la eliminación archiva el historial. La confirmación final y el pago corresponden a la siguiente etapa. El PHP original no tenía esquema SQL; la etapa 3 crea el esquema del catálogo y conserva sus datos TypeScript únicamente como fuente de importación inicial. El flujo compartido de Google valida tokens y crea nuevas cuentas como `usuario`, conservando los permisos existentes. La vinculación requiere sesión local y el mismo correo de Google.
+Ambos roles se dirigen a `/dashboard`: el usuario consulta/edita su perfil y administra sus propias sesiones; el administrador añade Productos, Inventario, Notificaciones y consulta de cuentas reales. Administra precios y stock; los productos agotados siguen visibles y la eliminación archiva el historial. La sección Pedidos permite consultar estados; las confirmaciones tardías sin stock generan una revisión administrativa. El PHP original no tenía esquema SQL; la etapa 3 crea el esquema del catálogo y conserva sus datos TypeScript únicamente como fuente de importación inicial. El flujo compartido de Google valida tokens y crea nuevas cuentas como `usuario`, conservando los permisos existentes. La vinculación requiere sesión local y el mismo correo de Google.
 
 ## Comprobaciones
 
@@ -111,6 +111,7 @@ npm.cmd run test:auth
 npm.cmd run test:auth-origins
 npm.cmd run test:dashboard
 npm.cmd run test:inventory
+npm.cmd run test:checkout
 npm.cmd run test:public-design
 ```
 
@@ -118,4 +119,4 @@ npm.cmd run test:public-design
 
 El inventario previo, las decisiones de migración y el plan de continuación están en [docs/ETAPA-1.md](docs/ETAPA-1.md). Los originales PHP se retiraron solo después de verificar sus reemplazos; hay un respaldo local en `.migration-backup/etapa-1-originales.zip` y las versiones originales siguen en Git.
 
-La configuración de PostgreSQL, el seed y Google están en [docs/ETAPA-2.md](docs/ETAPA-2.md). Las funciones por rol, las nuevas migraciones, la seguridad del panel y sus pruebas están en [docs/ETAPA-3.md](docs/ETAPA-3.md). La sesión visible, el inventario, las alertas, las API para preparar el checkout y la migración 003 se describen en [docs/ETAPA-4-INVENTARIO.md](docs/ETAPA-4-INVENTARIO.md). Los productos heredados empiezan con stock 0 y mantienen sus precios pendientes hasta que el administrador confirme esos datos.
+La configuración de PostgreSQL, el seed y Google están en [docs/ETAPA-2.md](docs/ETAPA-2.md). Las funciones por rol, las nuevas migraciones, la seguridad del panel y sus pruebas están en [docs/ETAPA-3.md](docs/ETAPA-3.md). La sesión visible, el inventario, las alertas, las API para preparar el checkout y la migración 003 se describen en [docs/ETAPA-4-INVENTARIO.md](docs/ETAPA-4-INVENTARIO.md). Los productos heredados empiezan con stock 0 y mantienen sus precios pendientes hasta que el administrador confirme esos datos. La entrega, ubicación opcional, reservas y pago Wompi SV están documentados en [docs/ETAPA-5-CHECKOUT.md](docs/ETAPA-5-CHECKOUT.md), con la migración 004, variables y datos que faltan para probar con el banco. No se inventaron tarifas ni credenciales.
