@@ -21,7 +21,8 @@ export async function ownSessions(user: SessionUser, req: Pick<IncomingMessage, 
 export async function dashboardStats(user: SessionUser): Promise<Stats> {
   assertAdmin(user);
   return (await getDatabase().query<Stats>(`SELECT (SELECT count(*)::int FROM catalog_products) AS products,
-    (SELECT count(*)::int FROM catalog_products WHERE active) AS visible,(SELECT count(*)::int FROM users) AS accounts`)).rows[0];
+    (SELECT count(*)::int FROM catalog_products WHERE active AND archived_at IS NULL) AS visible,(SELECT count(*)::int FROM users) AS accounts,
+    (SELECT count(*)::int FROM catalog_products WHERE active AND archived_at IS NULL AND stock=0) AS "outOfStock"`)).rows[0];
 }
 export async function accountList(user: SessionUser): Promise<AccountRecord[]> {
   assertAdmin(user);

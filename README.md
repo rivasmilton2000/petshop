@@ -1,6 +1,6 @@
 # LILAC & TOFFEE - PET SHOP
 
-Etapas 1, 2 y 3 terminadas: tienda en Next.js 16, React 19 y TypeScript usando **Pages Router**, con autenticación, dashboard compartido por roles y catálogo en PostgreSQL. La implementación de la portada está en `index.tsx`, junto a `package.json`, y las demás páginas de la tienda permanecen en `src/pages/website`, con estilos en `src/pages/website/css/website.css`. Se conservan la plantilla editorial, el logo y las imágenes. Google está implementado; falta probar el proveedor real cuando se configuren sus credenciales.
+Etapas 1, 2, 3 y ampliación de inventario terminadas: tienda en Next.js 16, React 19 y TypeScript usando **Pages Router**, con autenticación, dashboard compartido por roles y catálogo en PostgreSQL. La implementación de la portada está en `index.tsx`, junto a `package.json`, y las demás páginas de la tienda permanecen en `src/pages/website`, con estilos en `src/pages/website/css/website.css`. Se conservan la plantilla editorial, el logo y las imágenes. Google está implementado; falta probar el proveedor real cuando se configuren sus credenciales.
 
 ## Ejecutar en Windows
 
@@ -44,7 +44,21 @@ Esta aplicación corre en Node.js. XAMPP/PHP ya no ejecuta las páginas del proy
 
 Si la demo está activa, usa su enlace HTTPS para iniciar sesión. Para volver a desarrollo local en el puerto 3000, apágala con `scripts/Stop-Demo.ps1` y después ejecuta `npm.cmd run dev`. El proceso de la demo usa su dominio HTTPS como origen autorizado, sin cambiar `.env.local`.
 
-Se prepararon `scripts/Start-Demo.ps1` y `scripts/Stop-Demo.ps1` para ejecutar Next.js en producción y publicar solo `127.0.0.1:3000` mediante un túnel HTTPS de Cloudflare, sin abrir puertos del router. El enlace activo está en `artifacts/demo/state.json`. Las instrucciones para compartir, mantener los procesos abiertos, apagar la demo y la configuración pendiente de Google están en [docs/DEMO-TEMPORAL.md](docs/DEMO-TEMPORAL.md). PostgreSQL y Apache quedan fuera del túnel.
+Los scripts ejecutan Next.js en producción y publican solo su puerto local mediante Cloudflare, sin abrir puertos del router. PostgreSQL y Apache quedan fuera del túnel. Para encender:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Start-Demo.ps1
+```
+
+Si ya está encendida, devuelve el mismo enlace. Si el puerto está ocupado por `next dev` del mismo proyecto, lo sustituye por el servidor de producción; si pertenece a otro servicio, lo conserva y selecciona un puerto libre. Los registros viejos se limpian sin detener procesos ajenos. El enlace y el puerto reales se guardan en `artifacts/demo/state.json`.
+
+Para recompilar una demo activa, añade `-Restart`; se generará un enlace nuevo. Para apagar:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Stop-Demo.ps1
+```
+
+Next.js y cloudflared quedan en segundo plano. Mantén el PC encendido, con Internet y sin suspensión. Google sigue pendiente de credenciales y de autorizar el callback del dominio temporal.
 
 ## Estructura y rutas
 
@@ -80,11 +94,11 @@ Los recursos originales siguen en `img/` y `src/pages/website/img/`. `npm run as
 
 Se aplica la paleta `#B69BC1`, `#AD7653`, `#F7EEE7`, `#493234`, `#E8CFCC`, `#FFFFFF`, con huella, hueso y corazón como detalles. El nombre exacto de la marca aparece en cabecera, pie y metadatos. La navegación y el contenido están en español.
 
-El catálogo original estaba identificado como ejemplo. Sus nueve slugs, textos, imágenes y variantes se importan de forma repetible a PostgreSQL mediante `db:catalog`, sin sobrescribir posteriores ediciones del administrador. Sus precios siguen siendo `null`. Portada, catálogo y detalle consultan solo los productos visibles de la base. No se publican ofertas, testimonios, certificaciones, contactos, horarios, direcciones, mapas ni condiciones comerciales ficticias. El carrito permite guardar una selección de ejemplo en el navegador, sin pedidos ni pagos. El formulario de contacto prepara un texto para copiar y no envía ni persiste datos personales.
+El catálogo original estaba identificado como ejemplo. Sus nueve slugs, textos, imágenes y variantes se importan de forma repetible a PostgreSQL mediante `db:catalog`, sin sobrescribir posteriores ediciones del administrador. Sus precios siguen siendo `null`. Portada, catálogo y detalle consultan solo los productos visibles de la base. No se publican ofertas, testimonios, certificaciones, contactos, horarios, direcciones, mapas ni condiciones comerciales ficticias. El carrito conserva la selección en el navegador y verifica precios y stock en PostgreSQL al modificarla y preparar un pedido. Se guardan preparaciones verificadas, sin reservar existencias, confirmar ventas ni procesar pagos. El formulario de contacto prepara un texto para copiar y no envía ni persiste datos personales.
 
 **PostgreSQL gestiona autenticación y catálogo.** El registro público asigna exclusivamente el rol `usuario`; las contraseñas usan Argon2id. Las sesiones de siete días se guardan mediante hashes de tokens aleatorios, con cookie HttpOnly. El rol se consulta en el servidor en cada acceso protegido. El seed repetible prepara una cuenta `usuario` y otra `administrador`, con credenciales tomadas de las variables `SEED_*` de `.env.local`.
 
-Ambos roles se dirigen a `/dashboard`: el usuario consulta/edita su perfil y administra sus propias sesiones; el administrador añade gestión del catálogo de ejemplo y consulta de cuentas reales. No hay inventario comercial, pedidos ni pagos. El PHP original no tenía esquema SQL; la etapa 3 crea el esquema del catálogo y conserva sus datos TypeScript únicamente como fuente de importación inicial. El flujo compartido de Google valida tokens y crea nuevas cuentas como `usuario`, conservando los permisos existentes. La vinculación requiere sesión local y el mismo correo de Google.
+Ambos roles se dirigen a `/dashboard`: el usuario consulta/edita su perfil y administra sus propias sesiones; el administrador añade Productos, Inventario, Notificaciones y consulta de cuentas reales. Administra precios y stock; los productos agotados siguen visibles y la eliminación archiva el historial. La confirmación final y el pago corresponden a la siguiente etapa. El PHP original no tenía esquema SQL; la etapa 3 crea el esquema del catálogo y conserva sus datos TypeScript únicamente como fuente de importación inicial. El flujo compartido de Google valida tokens y crea nuevas cuentas como `usuario`, conservando los permisos existentes. La vinculación requiere sesión local y el mismo correo de Google.
 
 ## Comprobaciones
 
@@ -96,10 +110,12 @@ npm.cmd run test:smoke
 npm.cmd run test:auth
 npm.cmd run test:auth-origins
 npm.cmd run test:dashboard
+npm.cmd run test:inventory
+npm.cmd run test:public-design
 ```
 
 `check` ejecuta TypeScript estricto y la compilación de producción. Las pruebas de navegador verifican cinco páginas en 1440, 768, 390 y 320 px; redirecciones, parámetros, imágenes, fuentes, navegación móvil, búsqueda, categorías, orden, galería, variantes, cantidades, carrito persistente, cierre y foco con Escape, consulta local y preguntas con enlace directo. Se comprueban errores de JavaScript, solicitudes fallidas y desbordamiento horizontal. Las capturas y el informe se generan en `artifacts/` (sin seguimiento Git).
 
 El inventario previo, las decisiones de migración y el plan de continuación están en [docs/ETAPA-1.md](docs/ETAPA-1.md). Los originales PHP se retiraron solo después de verificar sus reemplazos; hay un respaldo local en `.migration-backup/etapa-1-originales.zip` y las versiones originales siguen en Git.
 
-La configuración de PostgreSQL, el seed y Google están en [docs/ETAPA-2.md](docs/ETAPA-2.md). Las funciones por rol, las nuevas migraciones, la seguridad del panel y sus pruebas están en [docs/ETAPA-3.md](docs/ETAPA-3.md). No se ha iniciado una etapa posterior a la 3.
+La configuración de PostgreSQL, el seed y Google están en [docs/ETAPA-2.md](docs/ETAPA-2.md). Las funciones por rol, las nuevas migraciones, la seguridad del panel y sus pruebas están en [docs/ETAPA-3.md](docs/ETAPA-3.md). La sesión visible, el inventario, las alertas, las API para preparar el checkout y la migración 003 se describen en [docs/ETAPA-4-INVENTARIO.md](docs/ETAPA-4-INVENTARIO.md). Los productos heredados empiezan con stock 0 y mantienen sus precios pendientes hasta que el administrador confirme esos datos.

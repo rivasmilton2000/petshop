@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run build",
     "test:smoke": "node scripts/smoke.mjs",
+    "test:public-design": "node scripts/verify-public-design.mjs",
     "db:configure": "node scripts/database/configure.mjs",
     "db:create": "node scripts/database/create.mjs",
     "db:migrate": "node scripts/database/migrate.mjs",
@@ -21,7 +22,8 @@
     "db:catalog": "node --import tsx scripts/database/catalog.ts",
     "test:auth": "node --import tsx scripts/test-auth.ts",
     "test:auth-origins": "node --import tsx scripts/test-auth-origins.ts",
-    "test:dashboard": "node --import tsx scripts/test-dashboard.ts"
+    "test:dashboard": "node --import tsx scripts/test-dashboard.ts",
+    "test:inventory": "node --import tsx scripts/test-inventory.ts"
   },
   "dependencies": {
     "@fontsource/montserrat": "^5.2.8",

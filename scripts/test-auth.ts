@@ -35,7 +35,7 @@ try {
   }
   assert.deepEqual((await pool.query('SELECT id, role, seed_key FROM users WHERE seed_key IS NOT NULL ORDER BY seed_key')).rows, seedBefore);
   assert.equal(seedBefore.length, 2);
-  assert.equal((await pool.query('SELECT count(*)::int AS n FROM schema_migrations')).rows[0].n, 2);
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM schema_migrations')).rows[0].n, (await readdir('database/migrations')).filter(name => /^\d+_.*\.sql$/.test(name)).length);
   assert.equal((await pool.query(`SELECT count(*)::int AS n FROM users u LEFT JOIN roles r ON r.name=u.role WHERE r.name IS NULL`)).rows[0].n, 0);
   await assert.rejects(pool.query("INSERT INTO oauth_accounts(provider, subject, user_id) VALUES ('google', $1, $2)", [`missing-${run}`, randomUUID()]), (error: unknown) => (error as { code: string }).code === '23503');
   checks.push('Conexión petshop; migración y seed ejecutados dos veces sin duplicar usuarios ni cambiar IDs; claves foráneas validadas.');

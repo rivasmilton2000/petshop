@@ -3,9 +3,9 @@ import { Layout } from '@/components/Layout';
 import { Motif } from '@/components/Motif';
 
 const faqs = [
-  { id: 'catalogo', category: 'general', question: '¿Puedo comprar desde la tienda?', answer: 'Por ahora puedes explorar un catálogo de ejemplo y guardar una selección en tu navegador. Los precios, el inventario y las compras todavía no están disponibles.' },
+  { id: 'catalogo', category: 'general', question: '¿Puedo comprar desde la tienda?', answer: 'Puedes explorar el catálogo, consultar precios y stock, añadir productos al carrito y preparar tu selección con una cuenta. El pago y la confirmación final estarán disponibles en la siguiente etapa.' },
   { id: 'mascotas', category: 'general', question: '¿Cómo encuentro ideas para mi mascota?', answer: 'En la tienda puedes explorar por especie o por categoría: alimentación, juguetes y cuidado y accesorios. También puedes buscar por nombre.' },
-  { id: 'carrito', category: 'general', question: '¿Se guarda mi selección?', answer: 'El carrito de ejemplo se guarda en este navegador cuando el almacenamiento local está disponible. No crea un pedido ni reserva inventario.' },
+  { id: 'carrito', category: 'general', question: '¿Se guarda mi selección?', answer: 'El carrito se guarda en este navegador cuando el almacenamiento local está disponible. Comprobamos el precio y el stock al modificarlo y preparar tu pedido. El carrito no reserva inventario.' },
   { id: 'envios', category: 'store', question: '¿Dónde puedo consultar los envíos?', answer: 'Las zonas, los costos y los tiempos de entrega aún están pendientes de confirmación. No se han publicado condiciones de envío.' },
   { id: 'atencion', category: 'store', question: '¿Cuáles son los canales de atención?', answer: 'El teléfono, el correo, la dirección y los horarios de atención están pendientes de confirmación.' },
 ];

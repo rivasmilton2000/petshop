@@ -65,10 +65,10 @@ try {
   assert.equal((await (await member.get('/api/auth/session')).json()).user.id,users[0].id);
   checks.push('Edición del nombre persistida en PostgreSQL; cerrar otras sesiones revoca solo las propias y mantiene la sesión actual y las de otra cuenta.');
 
-  const input = { id: slugs[0], name:'Producto API de prueba', category:'care-accessories', animals:['dogs'], image:'eco-collar-sage.jpg', description:'Descripción de ensayo para verificar la gestión real del catálogo.', active:false, colors:[{name:'Rosa',image:'eco-collar-pink.jpg'},{name:'Verde',image:'eco-collar-sage.jpg'}] };
+  const input = { id: slugs[0], price: 9.5, stock: 4, name:'Producto API de prueba', category:'care-accessories', animals:['dogs'], image:'eco-collar-sage.jpg', description:'Descripción de ensayo para verificar la gestión real del catálogo.', active:false, colors:[{name:'Rosa',image:'eco-collar-pink.jpg'},{name:'Verde',image:'eco-collar-sage.jpg'}] };
   const created = await post(admin,'/api/dashboard/catalog',input); assert.equal(created.status(),201);
   let product = (await created.json()).product;
-  assert.equal(product.isDemo,true); assert.equal(product.price,null); assert.equal(product.colors.length,2);
+  assert.equal(product.isDemo,false); assert.equal(product.price,9.5); assert.equal(product.colors.length,2);
   assert.equal((await anonymous.get(`/website/product-detail?id=${slugs[0]}`)).status(),404);
   assert.equal((await post(admin,'/api/dashboard/catalog',input)).status(),409);
   const {id:_id,...fields}=input;
@@ -79,7 +79,7 @@ try {
   assert.equal(published.name,'Nombre editado en PostgreSQL'); assert.equal(published.version,undefined); assert.equal(published.colors.length,2);
   const detail=await anonymous.get(`/website/product-detail?id=${slugs[0]}`); assert.equal(detail.status(),200); assert.equal((await detail.text()).includes('Nombre editado en PostgreSQL'),true);
   assert.equal((await post(admin,`/api/dashboard/catalog/${slugs[0]}`,{...fields,version:product.version,image:'../../.env.local'})).status(),400);
-  assert.equal((await post(admin,`/api/dashboard/catalog/${slugs[0]}`,{...fields,version:product.version,price:1})).status(),400);
+  assert.equal((await post(admin,`/api/dashboard/catalog/${slugs[0]}`,{...fields,version:product.version,price:-1})).status(),400);
   assert.equal((await post(admin,`/api/dashboard/catalog/${slugs[0]}`,{...fields,version:product.version},{Origin:'https://otro.example'})).status(),403);
   assert.equal((await post(admin,`/api/dashboard/catalog/${slugs[0]}`,{...fields,version:product.version,active:false})).status(),200);
   assert.equal((await anonymous.get(`/website/product-detail?id=${slugs[0]}`)).status(),404);
@@ -101,11 +101,11 @@ try {
       await page.locator('#auth-email').fill(user.email); await page.locator('#auth-password').fill(password);
       await page.getByRole('button',{name:'Entrar',exact:true}).click();
       await expect(page).toHaveURL(`${baseURL}/dashboard`);
-      await expect(page).toHaveTitle(/Inicio.*LILAC & TOFFEE - PET SHOP/);
+      await expect(page).toHaveTitle(/Inicio.*LILAC & TOFFEE$/);
       await page.evaluate(()=>document.fonts.ready);
       const nav=page.getByRole('navigation',{name:'Navegación del panel',includeHidden:true});
-      await expect(nav.locator('a')).toHaveCount(user.role==='administrador'?5:3);
-      if(user.role==='usuario') {await expect(nav.getByRole('link',{name:'Catálogo',exact:true})).toHaveCount(0);await expect(nav.getByRole('link',{name:'Cuentas',exact:true})).toHaveCount(0);}
+      await expect(nav.locator('a')).toHaveCount(user.role==='administrador'?7:3);
+      if(user.role==='usuario') {await expect(nav.getByRole('link',{name:'Productos',exact:true})).toHaveCount(0);await expect(nav.getByRole('link',{name:'Cuentas',exact:true})).toHaveCount(0);}
       expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
       await page.screenshot({path:`artifacts/dashboard-${user.role}-${width}-overview.png`,fullPage:true});
       const navigate=async(label:string,section:string)=>{
@@ -131,13 +131,15 @@ try {
         if(await revoke.isEnabled()) {await revoke.click();await expect(page.getByRole('status')).toContainText('Otras sesiones cerradas:');}
       }
       if(user.role==='administrador') {
-        await navigate('Catálogo','catalog');
-        await expect(page.getByRole('heading',{name:'Catálogo',exact:true})).toBeVisible();
+        await navigate('Productos','catalog');
+        await expect(page.getByRole('heading',{name:'Productos',exact:true})).toBeVisible();
         await page.screenshot({path:`artifacts/dashboard-admin-${width}-catalog.png`,fullPage:true});
         if(width===390) {
           await page.getByRole('button',{name:'Nuevo producto',exact:true}).click();
           await page.getByLabel('Nombre',{exact:true}).fill('Producto visual de prueba');
           await page.getByLabel('Identificador',{exact:true}).fill(slugs[1]);
+          await page.getByLabel('Precio (USD)',{exact:true}).fill('8.75');
+          await page.getByLabel('Stock',{exact:true}).fill('2');
           await page.getByLabel('Descripción',{exact:true}).fill('Producto temporal creado desde el formulario móvil del panel.');
           await page.getByRole('button',{name:'Añadir variante',exact:true}).click();
           await page.getByLabel('Nombre de variante 1',{exact:true}).fill('Presentación de prueba');
@@ -173,6 +175,7 @@ try {
   console.log(checks.join('\n'));
 } finally {
   await browser.close(); for(const context of contexts) await context.dispose();
+  await pool.query('DELETE FROM inventory_movements WHERE product_id=ANY($1::text[])',[slugs]);
   await pool.query('DELETE FROM catalog_products WHERE id=ANY($1::text[])',[slugs]);
   await pool.query('DELETE FROM users WHERE id=ANY($1::uuid[]) AND seed_key IS NULL',[users.map(user=>user.id)]);
   await pool.end();

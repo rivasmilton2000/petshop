@@ -1,16 +1,43 @@
-param([ValidateRange(1024, 65535)][int]$Port = 3000, [switch]$SkipBuild)
+param([ValidateRange(1024, 65535)][int]$Port = 3000, [switch]$SkipBuild, [switch]$Restart)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $demoDirectory = Join-Path $projectRoot 'artifacts/demo'
 $statePath = Join-Path $demoDirectory 'state.json'
 New-Item -ItemType Directory -Path $demoDirectory -Force | Out-Null
-
-if (Test-Path -LiteralPath $statePath) { throw 'Existe una demo registrada. Ejecuta scripts/Stop-Demo.ps1 antes de iniciar otra.' }
-if (Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue) { throw "El puerto $Port esta ocupado. Cierra el servidor Next anterior antes de continuar." }
+. (Join-Path $PSScriptRoot 'Demo-Processes.ps1')
 
 $cloudCommand = Get-Command cloudflared -ErrorAction SilentlyContinue
 $cloudExecutable = if ($cloudCommand) { $cloudCommand.Source } else { Join-Path $demoDirectory 'tools/cloudflared.exe' }
-if (-not (Test-Path -LiteralPath $cloudExecutable)) { throw 'Falta cloudflared. Consulta docs/DEMO-TEMPORAL.md para descargarlo o instalarlo.' }
+if (-not (Test-Path -LiteralPath $cloudExecutable)) { throw 'Falta cloudflared. Instala Cloudflare.cloudflared o guarda el ejecutable oficial en artifacts/demo/tools/cloudflared.exe.' }
+
+if (Test-Path -LiteralPath $statePath) {
+    $previous = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+    if ($previous.root -ne $projectRoot) { throw 'El registro pertenece a otro proyecto. No se detuvieron procesos.' }
+    $activeServer = Get-DemoProcess $previous.server 'server' $projectRoot $previous.port
+    $activeTunnel = Get-DemoProcess $previous.tunnel 'tunnel' $projectRoot $previous.port
+    $healthy = $false
+    if ($activeServer -and $activeTunnel -and $previous.url -match '^https://[a-z0-9-]+\.trycloudflare\.com$') {
+        try {
+            $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$($previous.port)/" -TimeoutSec 5
+            $healthy = $response.StatusCode -eq 200 -and $response.Content.Contains('Happy Tails Start Here')
+        } catch { $healthy = $false }
+    }
+    if ($healthy -and -not $Restart) {
+        Write-Output "La demo ya esta encendida: $($previous.url)"
+        Write-Output "Puerto local: $($previous.port). Para recompilar y reiniciar usa -Restart."
+        exit 0
+    }
+    Stop-DemoRecord $previous.tunnel 'tunnel' $projectRoot $previous.port
+    Stop-DemoRecord $previous.server 'server' $projectRoot $previous.port
+    Remove-Item -LiteralPath $statePath
+    Write-Output 'Registro anterior limpiado; preparando una nueva demo.'
+}
+
+Stop-PetshopNextOnPort $Port $projectRoot
+$occupied = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty LocalPort)
+$selectedPort = Select-DemoPort $Port $occupied
+if ($selectedPort -ne $Port) { Write-Output "El puerto $Port pertenece a otro servicio; se conserva y la demo usara el puerto $selectedPort." }
+$Port = $selectedPort
 
 function Save-State {
     $script:state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $statePath -Encoding UTF8
@@ -36,7 +63,7 @@ function Wait-Next($Process) {
         if ($Process.HasExited) { throw 'Next.js se detuvo. Revisa artifacts/demo/next.err.log.' }
         try {
             $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$Port/" -TimeoutSec 3
-            if ($response.StatusCode -eq 200 -and $response.Content.Contains('Amor en cada huella.')) { return }
+            if ($response.StatusCode -eq 200 -and $response.Content.Contains('Happy Tails Start Here')) { return }
         } catch { Start-Sleep -Milliseconds 300 }
     }
     throw 'Next.js no respondio con la portada dentro del tiempo esperado.'

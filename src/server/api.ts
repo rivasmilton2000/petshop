@@ -21,8 +21,8 @@ export function endpoint(handler: (req: NextApiRequest, res: NextApiResponse) =>
 export function requireMethod(req: NextApiRequest, res: NextApiResponse, method: string) {
   if (req.method !== method) { res.setHeader('Allow', method); throw new HttpError(405, 'Método no permitido.'); }
 }
-export function requireMutation(req: NextApiRequest, res: NextApiResponse) {
-  requireMethod(req, res, 'POST');
+export function requireMutation(req: NextApiRequest, res: NextApiResponse, method = 'POST') {
+  requireMethod(req, res, method);
   // Origen configurado o alias de loopback explícito, con el mismo puerto.
   if (!isAllowedMutationOrigin(req.headers.origin) || req.headers['sec-fetch-site'] === 'cross-site') throw new HttpError(403, 'Origen de la solicitud no permitido.');
   if (req.headers['content-type']?.split(';')[0].trim().toLowerCase() !== 'application/json') throw new HttpError(415, 'Usa el formato JSON.');

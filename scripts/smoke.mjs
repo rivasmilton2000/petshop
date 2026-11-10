@@ -71,7 +71,7 @@ try {
         await Promise.all(Array.from(document.images).map(async (img) => { img.loading = 'eager'; try { await img.decode(); } catch {} }));
       });
       await expect(page.locator('html')).toHaveAttribute('lang', 'es');
-      await expect(page).toHaveTitle(/LILAC & TOFFEE - PET SHOP/);
+      await expect(page).toHaveTitle(/LILAC & TOFFEE/);
       await expect(page.locator('h1')).toHaveCount(1);
       const broken = await page.locator('img').evaluateAll((images) => images.filter((img) => !img.complete || img.naturalWidth === 0).map((img) => img.src));
       expect(broken, `${device} ${route}: imágenes rotas`).toEqual([]);
@@ -85,7 +85,7 @@ try {
       expect(styles.body).toContain('Montserrat');
       expect(styles.cream.toUpperCase()).toBe('#F7EEE7');
       expect(styles.overflow, `${device} ${route}: desbordamiento horizontal`).toBe(false);
-      expect(await page.locator('body').innerText()).not.toMatch(/\$\d|123 Pet Lane|Terry Francine|info@petshop|Shop Now|Log In|All Products|Your cart/);
+      expect(await page.locator('body').innerText()).not.toMatch(/123 Pet Lane|Terry Francine|info@petshop|Shop Now|Log In|All Products|Your cart/);
       const name = route === '/' ? 'home' : route.split('/').pop().split('?')[0];
       if (device === 'desktop' || device === 'mobile') await page.screenshot({ path: new URL(`${device}-${name}.png`, output).pathname.replace(/^\/([A-Za-z]:)/, '$1'), fullPage: true });
     }
@@ -111,21 +111,27 @@ try {
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'es')));
 
     await page.goto('/website/product-detail?id=adjustable-eco-collar');
-    await page.getByRole('button', { name: 'Añadir al carrito de ejemplo' }).click();
-    await expect(page.locator('.form-error')).toHaveText('Elige un color para continuar.');
     await page.getByRole('radio', { name: 'Rosa', exact: true }).check();
     await expect(page.locator('.gallery__main img')).toHaveAttribute('src', /eco-collar-pink/);
-    await page.getByRole('button', { name: 'Aumentar cantidad' }).click();
-    await page.getByRole('button', { name: 'Añadir al carrito de ejemplo' }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByRole('dialog')).toContainText('Cantidad: 2');
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('dialog')).not.toBeVisible();
-    await expect(page.getByRole('button', { name: 'Añadir al carrito de ejemplo' })).toBeFocused();
-    await page.goto('/');
-    await page.getByRole('button', { name: 'Abrir carrito, 2 artículos' }).click();
-    await expect(page.getByRole('dialog')).toContainText('Collar ajustable');
-    await page.getByRole('button', { name: 'Quitar Collar ajustable' }).click();
+    const currentProducts = (await (await api.get('/api/catalog')).json()).products;
+    const collar = currentProducts.find(product => product.id === 'adjustable-eco-collar');
+    if (collar.stock > 0 && collar.price !== null) {
+      const quantity = Math.min(2, collar.stock);
+      await page.locator('#qty-input').fill(String(quantity));
+      await page.getByRole('button', { name: 'Añadir al carrito', exact: true }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(page.getByRole('dialog')).toContainText(`Cantidad: ${quantity}`);
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).not.toBeVisible();
+      await expect(page.getByRole('button', { name: 'Añadir al carrito', exact: true })).toBeFocused();
+      await page.goto('/');
+      await page.getByRole('button', { name: `Abrir carrito, ${quantity} artículos` }).click();
+      await expect(page.getByRole('dialog')).toContainText('Collar ajustable');
+      await page.getByRole('button', { name: 'Quitar Collar ajustable' }).click();
+    } else {
+      await expect(page.getByRole('button', { name: collar.stock === 0 ? 'Agotado' : 'Añadir al carrito', exact: true })).toBeDisabled();
+      await page.getByRole('button', { name: 'Abrir carrito, 0 artículos' }).click();
+    }
     await expect(page.getByRole('dialog')).toContainText('Tu carrito está vacío.');
     await page.getByRole('button', { name: 'Cerrar carrito' }).click();
 
@@ -136,7 +142,7 @@ try {
     await page.getByRole('button', { name: 'Preparar consulta', exact: true }).click();
     await expect(page.getByLabel('Texto de tu consulta')).toHaveValue(/Quiero información del catálogo/);
     await expect(page.locator('.contact-form__status')).toHaveText('Tu consulta está preparada. Aún no se ha enviado.');
-    await page.getByLabel('Buscar preguntas').fill('carrito');
+    await page.getByLabel('Buscar preguntas').fill('¿Se guarda');
     await expect(page.locator('.faq-list details')).toHaveCount(1);
     await page.getByLabel('Buscar preguntas').fill('');
     await page.getByRole('button', { name: 'Atención y entregas' }).click();

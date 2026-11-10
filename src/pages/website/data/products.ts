@@ -6,6 +6,7 @@ export type Product = {
   image: string;
   description: string;
   price: number | null;
+  stock: number;
   colors?: { name: string; image: string }[];
 };
 
@@ -28,7 +29,8 @@ export const products: Product[] = [
   { id: 'cozy-knit-sweater', name: 'Suéter de punto', category: 'care-accessories', animals: ['dogs', 'small-pets'], image: 'knit-sweater.jpg', description: 'Una idea de abrigo para explorar. Revisa siempre la talla y las necesidades de tu mascota.', price: null },
   { id: 'salmon-crunch-treats', name: 'Premios para mascotas', category: 'pet-food', animals: ['dogs', 'cats'], image: 'crunch-treats.jpg', description: 'Descubre ideas para sus pequeños premios. Los ingredientes y las indicaciones estarán disponibles con el catálogo confirmado.', price: null },
   { id: 'feather-wand', name: 'Varita con plumas', category: 'eco-toys', animals: ['cats', 'birds'], image: 'feather-wand.jpg', description: 'Una idea de juego compartido. Supervisa su uso y elige accesorios adecuados para cada mascota.', price: null },
-];
+].map((product) => ({ ...product, stock: 0 }));
 
-export const productImage = (file: string) => `/website/img/products/${file}`;
+export const productImage = (file: string) => file.startsWith('/img/') ? file : `/website/img/products/${file}`;
+export const formatPrice = (price: number | null) => price === null ? 'Precio pendiente' : new Intl.NumberFormat('es-SV', { style: 'currency', currency: 'USD' }).format(price);
 export const productHref = (id: string) => `/website/product-detail?id=${encodeURIComponent(id)}`;
